@@ -1,0 +1,1276 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Struktur Sel Sperma & Sel Ovum - WebGL 3D Interaktif</title>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Three.js Library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+    <!-- OrbitControls -->
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background-color: #05050f;
+            color: #f3f4f6;
+            overflow-x: hidden;
+        }
+        canvas {
+            outline: none;
+        }
+        .glass-panel {
+            background: rgba(10, 15, 30, 0.85);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .glass-card {
+            background: rgba(20, 28, 50, 0.65);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .glass-card:hover {
+            border-color: rgba(99, 102, 241, 0.6);
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
+        }
+        .glass-card.active-card {
+            border-color: rgba(168, 85, 247, 0.9);
+            background: rgba(49, 28, 88, 0.55);
+            box-shadow: 0 0 22px rgba(168, 85, 247, 0.35);
+        }
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 5px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: rgba(10, 15, 30, 0.6);
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: rgba(99, 102, 241, 0.4);
+            border-radius: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: rgba(168, 85, 247, 0.7);
+        }
+
+        /* Badge themes */
+        .badge-sperma { background-color: rgba(99, 102, 241, 0.2); border-color: #6366f1; color: #a5b4fc; }
+        .badge-ovum { background-color: rgba(236, 72, 153, 0.2); border-color: #ec4899; color: #fbcfe8; }
+        .badge-organelle { background-color: rgba(20, 184, 166, 0.2); border-color: #14b8a6; color: #99f6e4; }
+    </style>
+</head>
+<body class="h-screen flex flex-col overflow-hidden bg-slate-950 text-slate-100 select-none">
+
+    <header class="h-16 border-b border-slate-800/80 glass-panel px-4 lg:px-6 flex items-center justify-between z-30 shrink-0">
+        <div class="flex items-center space-x-3">
+            <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 via-purple-600 to-pink-500 flex items-center justify-center shadow-lg shadow-indigo-500/25">
+                <i class="fa-solid fa-dna text-white text-lg"></i>
+            </div>
+            <div>
+                <h1 class="font-bold text-base md:text-xl text-transparent bg-clip-text bg-gradient-to-r from-indigo-300 via-purple-200 to-pink-300">
+                    Sistem Reproduksi: Sel Sperma & Ovum <span class="text-xs md:text-sm font-normal text-slate-400">(3D Visualizer)</span>
+                </h1>
+                <p class="text-xs text-slate-400 hidden sm:block">Eksplorasi Anatomi, Ciri-Ciri, dan Proses Fertilisasi Interaktif</p>
+            </div>
+        </div>
+
+        <div class="flex items-center space-x-2 sm:space-x-3">
+            <button id="btn-simulasi-pembuahan" onclick="startFertilizationSim()" class="px-3 py-1.5 text-xs font-semibold rounded-lg bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-500 hover:to-purple-500 text-white shadow-lg shadow-pink-600/30 transition flex items-center space-x-2">
+                <i class="fa-solid fa-bolt animate-pulse"></i>
+                <span class="hidden md:inline">Simulasi Fertilisasi</span>
+            </button>
+            <button id="btn-toggle-quiz" onclick="openQuizModal()" class="px-3 py-1.5 text-xs font-semibold rounded-lg bg-amber-600 hover:bg-amber-500 text-white shadow-md shadow-amber-600/30 transition flex items-center space-x-2">
+                <i class="fa-solid fa-graduation-cap"></i>
+                <span class="hidden md:inline">Kuis Interaktif</span>
+            </button>
+            <button onclick="focusCell('all')" class="p-2 text-xs font-semibold rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition" title="Reset Tampilan 3D">
+                <i class="fa-solid fa-arrows-rotate"></i>
+            </button>
+        </div>
+    </header>
+
+    <div class="flex-1 flex flex-col md:flex-row relative overflow-hidden">
+        
+        <!-- 3D Canvas Viewport Container -->
+        <div class="flex-1 relative h-full w-full bg-slate-950">
+            <!-- WebGL Canvas -->
+            <div id="webgl-container" class="absolute inset-0 w-full h-full cursor-grab active:cursor-grabbing"></div>
+
+            <!-- On-Canvas Controls & View Presets -->
+            <div class="absolute top-4 left-4 z-20 flex flex-col space-y-3">
+                <div class="glass-panel rounded-xl p-3 shadow-xl border border-slate-700/60 flex flex-col space-y-2 text-xs max-w-xs">
+                    <span class="text-slate-400 font-semibold text-[11px] uppercase tracking-wider flex items-center space-x-1">
+                        <i class="fa-solid fa-eye text-indigo-400"></i>
+                        <span>Fokus Tampilan Sel</span>
+                    </span>
+                    <div class="grid grid-cols-2 gap-1.5">
+                        <button onclick="focusCell('all')" class="px-2 py-1.5 rounded-lg bg-slate-800/90 hover:bg-indigo-600/30 hover:text-indigo-200 border border-slate-700/70 text-left transition flex items-center space-x-2 col-span-2">
+                            <span class="w-2.5 h-2.5 rounded-full bg-gradient-to-r from-indigo-400 to-pink-400"></span>
+                            <span class="font-medium">Kedua Sel (Overview)</span>
+                        </button>
+                        <button onclick="focusCell('sperma')" class="px-2 py-1.5 rounded-lg bg-slate-800/90 hover:bg-indigo-600/30 hover:text-indigo-200 border border-slate-700/70 text-left transition flex items-center space-x-2">
+                            <span class="w-2.5 h-2.5 rounded-full bg-indigo-500"></span>
+                            <span>Sel Sperma</span>
+                        </button>
+                        <button onclick="focusCell('ovum')" class="px-2 py-1.5 rounded-lg bg-slate-800/90 hover:bg-pink-600/30 hover:text-pink-200 border border-slate-700/70 text-left transition flex items-center space-x-2">
+                            <span class="w-2.5 h-2.5 rounded-full bg-pink-500"></span>
+                            <span>Sel Ovum</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Quick Filter / Search Input -->
+                <div class="glass-panel rounded-xl p-2 shadow-xl border border-slate-700/60 flex items-center space-x-2 max-w-xs">
+                    <i class="fa-solid fa-magnifying-glass text-slate-400 text-xs ml-2"></i>
+                    <input type="text" id="part-search" placeholder="Cari akrosom, korona radiata, nukleus..." class="bg-transparent border-none text-xs text-slate-200 focus:outline-none w-full placeholder-slate-500">
+                </div>
+            </div>
+
+            <!-- Top Right Overview Card -->
+            <div class="absolute top-4 right-4 z-20 hidden lg:block max-w-xs">
+                <div class="glass-panel rounded-xl p-3 border border-slate-700/60 text-xs space-y-1">
+                    <div class="font-bold text-amber-300 flex items-center space-x-1.5">
+                        <i class="fa-solid fa-lightbulb text-amber-400"></i>
+                        <span>Gametogenesis & Fertilisasi</span>
+                    </div>
+                    <p class="text-slate-300 text-[11px] leading-relaxed">
+                        Pertemuan antara sel gamet jantan (Sperma) dan sel gamet betina (Ovum) membentuk zigot melalui proses pembuahan.
+                    </p>
+                </div>
+            </div>
+
+            <!-- Interactive 3D Tooltip Overlay -->
+            <div id="hotspot-tooltip" class="absolute hidden z-30 pointer-events-none transition-all duration-150 transform -translate-x-1/2 -translate-y-full mb-3">
+                <div class="glass-panel px-3 py-2 rounded-xl shadow-2xl border border-indigo-400/50 text-xs flex items-center space-x-2.5">
+                    <span id="tooltip-dot" class="w-3 h-3 rounded-full bg-indigo-400 animate-pulse"></span>
+                    <div>
+                        <div id="tooltip-name" class="font-bold text-slate-100">Bagian Organel</div>
+                        <div id="tooltip-desc" class="text-[10px] text-indigo-200">Fungsi utama</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Bottom Active Info Banner -->
+            <div class="absolute bottom-4 left-4 right-4 md:right-auto md:max-w-xl z-20 pointer-events-none">
+                <div class="glass-panel rounded-xl p-3.5 border border-slate-800 shadow-2xl text-xs flex items-center justify-between pointer-events-auto">
+                    <div class="flex items-center space-x-3">
+                        <div id="summary-icon-box" class="w-10 h-10 rounded-xl bg-indigo-500/20 text-indigo-400 flex items-center justify-center shrink-0 border border-indigo-500/30">
+                            <i id="summary-icon" class="fa-solid fa-microscope text-lg"></i>
+                        </div>
+                        <div>
+                            <p id="active-summary-title" class="font-bold text-slate-200 text-sm">Visualisasi 3D Sel Sperma & Sel Ovum</p>
+                            <p id="active-summary-desc" class="text-slate-400 text-[11px]">Arahkan kursor atau klik bagian sel pada model 3D / panel kanan untuk mempelajari fungsi struktur organel secara lengkap.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Side Nav Tabs and Content -->
+        <div class="w-full md:w-96 lg:w-[460px] h-96 md:h-full border-t md:border-t-0 md:border-l border-slate-800/80 glass-panel flex flex-col z-20 shrink-0">
+            
+            <!-- Navigation Header Tabs -->
+            <div class="grid grid-cols-3 border-b border-slate-800/80 bg-slate-900/60 text-xs font-semibold text-center">
+                <button id="tab-btn-parts" onclick="switchTab('parts')" class="py-3 text-indigo-400 border-b-2 border-indigo-500 bg-slate-800/50 transition">
+                    <i class="fa-solid fa-sitemap block mb-1"></i>
+                    <span>Anatomi Sel</span>
+                </button>
+                <button id="tab-btn-facts" onclick="switchTab('facts')" class="py-3 text-slate-400 hover:text-slate-200 transition">
+                    <i class="fa-solid fa-table-list block mb-1"></i>
+                    <span>Perbandingan</span>
+                </button>
+                <button id="tab-btn-process" onclick="switchTab('process')" class="py-3 text-slate-400 hover:text-slate-200 transition">
+                    <i class="fa-solid fa-heart-pulse block mb-1"></i>
+                    <span>Fertilisasi</span>
+                </button>
+            </div>
+
+            <!-- TAB CONTENT 1: Part-by-Part Anatomy & Details -->
+            <div id="tab-content-parts" class="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar">
+                
+                <!-- Sperma Section -->
+                <div class="space-y-2.5">
+                    <div class="flex items-center justify-between border-b border-indigo-500/30 pb-1.5">
+                        <h3 class="font-bold text-sm text-indigo-300 flex items-center space-x-2">
+                            <i class="fa-solid fa-mars text-indigo-400"></i>
+                            <span>1. Sel Sperma (Spermatozoa)</span>
+                        </h3>
+                        <span class="text-[10px] px-2 py-0.5 rounded-full badge-sperma font-medium border">Sel Kelamin Jantan</span>
+                    </div>
+                    <p class="text-[11px] text-slate-400">Sel kelamin jantan yang berfungsi untuk membuahi sel ovum.</p>
+
+                    <!-- Sperma Parts Cards -->
+                    <div id="card-akrosom" onclick="focusPart('akrosom')" class="glass-card p-3 rounded-xl cursor-pointer">
+                        <div class="flex items-center justify-between mb-1">
+                            <h4 class="font-bold text-xs text-indigo-300 flex items-center space-x-2">
+                                <span class="w-2 h-2 rounded-full bg-cyan-400"></span>
+                                <span>Akrosom</span>
+                            </h4>
+                            <span class="text-[10px] text-cyan-300 font-mono">Ujung Kepala</span>
+                        </div>
+                        <p class="text-[11px] text-slate-300 leading-snug">
+                            Mengandung enzim (akrosin) yang membantu menembus lapisan pelindung sel ovum saat pembuahan.
+                        </p>
+                    </div>
+
+                    <div id="card-nukleus_sperma" onclick="focusPart('nukleus_sperma')" class="glass-card p-3 rounded-xl cursor-pointer">
+                        <div class="flex items-center justify-between mb-1">
+                            <h4 class="font-bold text-xs text-indigo-300 flex items-center space-x-2">
+                                <span class="w-2 h-2 rounded-full bg-purple-400"></span>
+                                <span>Nukleus (Sperma)</span>
+                            </h4>
+                            <span class="text-[10px] text-purple-300 font-mono">Inti Sel (n)</span>
+                        </div>
+                        <p class="text-[11px] text-slate-300 leading-snug">
+                            Menyimpan materi genetik (DNA) haploid jantan yang akan diwariskan kepada keturunan.
+                        </p>
+                    </div>
+
+                    <div id="card-leher" onclick="focusPart('leher')" class="glass-card p-3 rounded-xl cursor-pointer">
+                        <div class="flex items-center justify-between mb-1">
+                            <h4 class="font-bold text-xs text-indigo-300 flex items-center space-x-2">
+                                <span class="w-2 h-2 rounded-full bg-blue-400"></span>
+                                <span>Leher</span>
+                            </h4>
+                            <span class="text-[10px] text-blue-300 font-mono">Penghubung</span>
+                        </div>
+                        <p class="text-[11px] text-slate-300 leading-snug">
+                            Menghubungkan bagian kepala dengan bagian tengah (midpiece) sperma.
+                        </p>
+                    </div>
+
+                    <div id="card-bagian_tengah" onclick="focusPart('bagian_tengah')" class="glass-card p-3 rounded-xl cursor-pointer">
+                        <div class="flex items-center justify-between mb-1">
+                            <h4 class="font-bold text-xs text-indigo-300 flex items-center space-x-2">
+                                <span class="w-2 h-2 rounded-full bg-amber-400"></span>
+                                <span>Bagian Tengah (Midpiece)</span>
+                            </h4>
+                            <span class="text-[10px] text-amber-300 font-mono">Mitokondria</span>
+                        </div>
+                        <p class="text-[11px] text-slate-300 leading-snug">
+                            Mengandung mitokondria padat yang menghasilkan energi (ATP) untuk pergerakan cambuk ekor.
+                        </p>
+                    </div>
+
+                    <div id="card-ekor" onclick="focusPart('ekor')" class="glass-card p-3 rounded-xl cursor-pointer">
+                        <div class="flex items-center justify-between mb-1">
+                            <h4 class="font-bold text-xs text-indigo-300 flex items-center space-x-2">
+                                <span class="w-2 h-2 rounded-full bg-indigo-400"></span>
+                                <span>Ekor (Flagelum)</span>
+                            </h4>
+                            <span class="text-[10px] text-indigo-300 font-mono">Alat Gerak</span>
+                        </div>
+                        <p class="text-[11px] text-slate-300 leading-snug">
+                            Memberikan gerakan cambuk mendayung agar sperma dapat berenang menuju sel ovum dalam saluran reproduksi.
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Ovum Section -->
+                <div class="space-y-2.5 pt-2">
+                    <div class="flex items-center justify-between border-b border-pink-500/30 pb-1.5">
+                        <h3 class="font-bold text-sm text-pink-300 flex items-center space-x-2">
+                            <i class="fa-solid fa-venus text-pink-400"></i>
+                            <span>2. Sel Ovum (Sel Telur)</span>
+                        </h3>
+                        <span class="text-[10px] px-2 py-0.5 rounded-full badge-ovum font-medium border">Sel Kelamin Betina</span>
+                    </div>
+                    <p class="text-[11px] text-slate-400">Sel kelamin betina yang berfungsi untuk dibuahi oleh sel sperma.</p>
+
+                    <!-- Ovum Parts Cards -->
+                    <div id="card-korona_radiata" onclick="focusPart('korona_radiata')" class="glass-card p-3 rounded-xl cursor-pointer">
+                        <div class="flex items-center justify-between mb-1">
+                            <h4 class="font-bold text-xs text-pink-300 flex items-center space-x-2">
+                                <span class="w-2 h-2 rounded-full bg-pink-400"></span>
+                                <span>Korona Radiata</span>
+                            </h4>
+                            <span class="text-[10px] text-pink-300 font-mono">Lapisan Luar</span>
+                        </div>
+                        <p class="text-[11px] text-slate-300 leading-snug">
+                            Lapisan sel folikel yang melindungi ovum serta memberi suplai nutrisi dan membantu proses pembuahan.
+                        </p>
+                    </div>
+
+                    <div id="card-zona_pellusida" onclick="focusPart('zona_pellusida')" class="glass-card p-3 rounded-xl cursor-pointer">
+                        <div class="flex items-center justify-between mb-1">
+                            <h4 class="font-bold text-xs text-pink-300 flex items-center space-x-2">
+                                <span class="w-2 h-2 rounded-full bg-rose-400"></span>
+                                <span>Zona Pellusida</span>
+                            </h4>
+                            <span class="text-[10px] text-rose-300 font-mono">Matriks Glikoprotein</span>
+                        </div>
+                        <p class="text-[11px] text-slate-300 leading-snug">
+                            Lapisan pelindung gelatin yang mencegah sperma masuk lebih dari satu (mencegah polispermi).
+                        </p>
+                    </div>
+
+                    <div id="card-nukleus_ovum" onclick="focusPart('nukleus_ovum')" class="glass-card p-3 rounded-xl cursor-pointer">
+                        <div class="flex items-center justify-between mb-1">
+                            <h4 class="font-bold text-xs text-pink-300 flex items-center space-x-2">
+                                <span class="w-2 h-2 rounded-full bg-purple-400"></span>
+                                <span>Nukleus (Ovum)</span>
+                            </h4>
+                            <span class="text-[10px] text-purple-300 font-mono">Inti Sel (n)</span>
+                        </div>
+                        <p class="text-[11px] text-slate-300 leading-snug">
+                            Menyimpan materi genetik (DNA) haploid betina yang siap bergabung dengan DNA jantan.
+                        </p>
+                    </div>
+
+                    <div id="card-sitoplasma" onclick="focusPart('sitoplasma')" class="glass-card p-3 rounded-xl cursor-pointer">
+                        <div class="flex items-center justify-between mb-1">
+                            <h4 class="font-bold text-xs text-pink-300 flex items-center space-x-2">
+                                <span class="w-2 h-2 rounded-full bg-orange-400"></span>
+                                <span>Sitoplasma</span>
+                            </h4>
+                            <span class="text-[10px] text-orange-300 font-mono">Ooplasma</span>
+                        </div>
+                        <p class="text-[11px] text-slate-300 leading-snug">
+                            Tempat berlangsungnya proses metabolisme sel dan kaya akan cadangan kuning telur (yolk) untuk perkembangan awal embrio.
+                        </p>
+                    </div>
+
+                    <div id="card-membran_plasma" onclick="focusPart('membran_plasma')" class="glass-card p-3 rounded-xl cursor-pointer">
+                        <div class="flex items-center justify-between mb-1">
+                            <h4 class="font-bold text-xs text-pink-300 flex items-center space-x-2">
+                                <span class="w-2 h-2 rounded-full bg-teal-400"></span>
+                                <span>Membran Plasma</span>
+                            </h4>
+                            <span class="text-[10px] text-teal-300 font-mono">Membran Vitelline</span>
+                        </div>
+                        <p class="text-[11px] text-slate-300 leading-snug">
+                            Mengatur keluar masuknya zat dan molekul nutrisi ke dalam sel ovum.
+                        </p>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- TAB CONTENT 2: Comparison & Biological Facts -->
+            <div id="tab-content-facts" class="hidden flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar">
+                
+                <div class="glass-panel p-3.5 rounded-xl border border-slate-700/60 space-y-2">
+                    <h4 class="font-bold text-xs text-indigo-300 flex items-center space-x-2">
+                        <i class="fa-solid fa-table-cells text-indigo-400"></i>
+                        <span>Tabel Perbandingan Sperma vs Ovum</span>
+                    </h4>
+                    <div class="overflow-x-auto rounded-lg border border-slate-800">
+                        <table class="w-full text-[11px] text-left text-slate-300">
+                            <thead class="bg-slate-900 text-slate-200 font-semibold text-[10px] uppercase border-b border-slate-800">
+                                <tr>
+                                    <th class="p-2 border-r border-slate-800">Karakteristik</th>
+                                    <th class="p-2 border-r border-slate-800 text-indigo-300">Sel Sperma</th>
+                                    <th class="p-2 text-pink-300">Sel Ovum</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-800/60 bg-slate-950/40">
+                                <tr>
+                                    <td class="p-2 font-semibold text-slate-300 border-r border-slate-800">Ukuran Sel</td>
+                                    <td class="p-2 border-r border-slate-800 text-indigo-200">50–60 µm (Sangat kecil)</td>
+                                    <td class="p-2 text-pink-200">100–150 µm (0,1–0,15 mm, Terbesar)</td>
+                                </tr>
+                                <tr>
+                                    <td class="p-2 font-semibold text-slate-300 border-r border-slate-800">Pergerakan (Motilitas)</td>
+                                    <td class="p-2 border-r border-slate-800 text-indigo-200">Motil (Bergerak aktif)</td>
+                                    <td class="p-2 text-pink-200">Non-motil (Pasif)</td>
+                                </tr>
+                                <tr>
+                                    <td class="p-2 font-semibold text-slate-300 border-r border-slate-800">Tempat Produksi</td>
+                                    <td class="p-2 border-r border-slate-800 text-indigo-200">Testis (Tubulus seminiferus)</td>
+                                    <td class="p-2 text-pink-200">Ovarium</td>
+                                </tr>
+                                <tr>
+                                    <td class="p-2 font-semibold text-slate-300 border-r border-slate-800">Frekuensi Produksi</td>
+                                    <td class="p-2 border-r border-slate-800 text-indigo-200">Jutaan per hari</td>
+                                    <td class="p-2 text-pink-200">1 sel per siklus menstruasi</td>
+                                </tr>
+                                <tr>
+                                    <td class="p-2 font-semibold text-slate-300 border-r border-slate-800">Cadangan Makanan</td>
+                                    <td class="p-2 border-r border-slate-800 text-indigo-200">Tidak ada</td>
+                                    <td class="p-2 text-pink-200">Kaya akan nutrisi (Sitoplasma)</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Sperma Facts Box -->
+                <div class="bg-indigo-950/30 p-3.5 rounded-xl border border-indigo-500/30 space-y-2 text-xs">
+                    <h4 class="font-bold text-indigo-300 flex items-center space-x-2">
+                        <i class="fa-solid fa-star text-amber-400"></i>
+                        <span>Fakta Menarik Sel Sperma:</span>
+                    </h4>
+                    <ul class="list-disc pl-4 space-y-1 text-[11px] text-slate-300">
+                        <li>Ukuran sel sperma sekitar <strong>50–60 mikrometer</strong>.</li>
+                        <li>Diproduksi di organ testis secara terus menerus setiap hari.</li>
+                        <li>Memiliki ekor cambuk (flagelum) yang bergerak cepat berenang hingga kecepatan <strong>3 mm per detik</strong>.</li>
+                    </ul>
+                </div>
+
+                <!-- Ovum Facts Box -->
+                <div class="bg-pink-950/30 p-3.5 rounded-xl border border-pink-500/30 space-y-2 text-xs">
+                    <h4 class="font-bold text-pink-300 flex items-center space-x-2">
+                        <i class="fa-solid fa-star text-amber-400"></i>
+                        <span>Fakta Menarik Sel Ovum:</span>
+                    </h4>
+                    <ul class="list-disc pl-4 space-y-1 text-[11px] text-slate-300">
+                        <li>Ukuran ovum sekitar <strong>100–150 mikrometer (0,1–0,15 mm)</strong> — salah satu sel terbesar dalam tubuh manusia!</li>
+                        <li>Dilepaskan dari ovarium satu kali setiap siklus menstruasi (Ovulasi).</li>
+                        <li>Memiliki cadangan nutrisi berlimpah dalam sitoplasmanya untuk menunjang awal perkembangan embrio.</li>
+                    </ul>
+                </div>
+
+            </div>
+
+            <!-- TAB CONTENT 3: Fertilization Process Steps -->
+            <div id="tab-content-process" class="hidden flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
+                
+                <div class="glass-panel p-3 rounded-xl border border-purple-500/30 text-xs space-y-2">
+                    <h4 class="font-bold text-purple-300 flex items-center space-x-2">
+                        <i class="fa-solid fa-diagram-project text-purple-400"></i>
+                        <span>Tahapan Fertilisasi (Pembuahan)</span>
+                    </h4>
+                    <p class="text-slate-300 text-[11px] leading-relaxed">
+                        Proses fertilisasi terjadi di tuba falopi (oviduk). Klik tombol di bawah untuk menjalankan simulasi animasi 3D!
+                    </p>
+                    <button onclick="startFertilizationSim()" class="w-full py-2 rounded-lg bg-gradient-to-r from-pink-600 to-indigo-600 font-bold text-white shadow-md hover:opacity-90 transition text-xs">
+                        <i class="fa-solid fa-play mr-1.5"></i> Jalankan Simulasi Pembuahan 3D
+                    </button>
+                </div>
+
+                <!-- Process Steps Cards -->
+                <div class="space-y-2 text-xs">
+                    <div class="p-3 rounded-xl bg-slate-900/80 border border-slate-800 space-y-1">
+                        <div class="flex items-center space-x-2 text-indigo-400 font-bold">
+                            <span class="w-5 h-5 rounded-full bg-indigo-500/20 flex items-center justify-center text-[10px] border border-indigo-500/40">1</span>
+                            <span>Penetrasi Korona Radiata</span>
+                        </div>
+                        <p class="text-[11px] text-slate-300 pl-7">
+                            Sperma berenang menembus lapisan luar sel-sel folikel korona radiata dengan bantuan kibasan ekor dan reaksi enzim.
+                        </p>
+                    </div>
+
+                    <div class="p-3 rounded-xl bg-slate-900/80 border border-slate-800 space-y-1">
+                        <div class="flex items-center space-x-2 text-purple-400 font-bold">
+                            <span class="w-5 h-5 rounded-full bg-purple-500/20 flex items-center justify-center text-[10px] border border-purple-500/40">2</span>
+                            <span>Reaksi Akrosom & Zona Pellusida</span>
+                        </div>
+                        <p class="text-[11px] text-slate-300 pl-7">
+                            Enzim akrosin pada tudung akrosom melarutkan zona pellusida, memungkinkan sperma menempel pada reseptor spesifik membran ovum.
+                        </p>
+                    </div>
+
+                    <div class="p-3 rounded-xl bg-slate-900/80 border border-slate-800 space-y-1">
+                        <div class="flex items-center space-x-2 text-pink-400 font-bold">
+                            <span class="w-5 h-5 rounded-full bg-pink-500/20 flex items-center justify-center text-[10px] border border-pink-500/40">3</span>
+                            <span>Pencegahan Polispermi (Reaksi Kortikal)</span>
+                        </div>
+                        <p class="text-[11px] text-slate-300 pl-7">
+                            Begitu satu sperma menyentuh membran plasma, zona pellusida mengeras untuk mencegah sperma lain masuk.
+                        </p>
+                    </div>
+
+                    <div class="p-3 rounded-xl bg-slate-900/80 border border-slate-800 space-y-1">
+                        <div class="flex items-center space-x-2 text-emerald-400 font-bold">
+                            <span class="w-5 h-5 rounded-full bg-emerald-500/20 flex items-center justify-center text-[10px] border border-emerald-500/40">4</span>
+                            <span>Peleburan Inti (Zigot)</span>
+                        </div>
+                        <p class="text-[11px] text-slate-300 pl-7">
+                            Materi genetik jantan dan betina melebur membentuk inti sel diploid (2n) yang berkembang menjadi zigot.
+                        </p>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <!-- Quiz Modal -->
+    <div id="quiz-modal" class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md hidden flex items-center justify-center p-4">
+        <div class="glass-panel w-full max-w-lg rounded-2xl border border-slate-700 p-5 shadow-2xl relative space-y-4">
+            <button onclick="closeQuizModal()" class="absolute top-4 right-4 text-slate-400 hover:text-white transition">
+                <i class="fa-solid fa-xmark text-lg"></i>
+            </button>
+            <div class="flex items-center space-x-3">
+                <div class="w-9 h-9 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center border border-amber-500/30">
+                    <i class="fa-solid fa-graduation-cap text-lg"></i>
+                </div>
+                <div>
+                    <h3 class="font-bold text-base text-amber-300">Kuis Sel Sperma & Ovum</h3>
+                    <p class="text-xs text-slate-400">Uji pemahaman anatomi dan fungsi sel kelamin!</p>
+                </div>
+            </div>
+
+            <div id="quiz-box" class="space-y-4">
+                <p id="quiz-question" class="text-sm font-semibold text-slate-200 bg-slate-900/80 p-3 rounded-xl border border-slate-800">
+                    Pertanyaan Kuis...
+                </p>
+                <div id="quiz-options" class="grid grid-cols-1 gap-2 text-xs">
+                    <!-- Dynamic option buttons -->
+                </div>
+                <div id="quiz-feedback" class="text-xs font-semibold hidden p-2.5 rounded-xl text-center">
+                </div>
+            </div>
+
+            <div class="flex justify-between items-center pt-2 border-t border-slate-800">
+                <span id="quiz-score" class="text-xs font-mono text-indigo-300">Skor: 0</span>
+                <button onclick="nextQuestion()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold transition">
+                    Pertanyaan Berikutnya <i class="fa-solid fa-arrow-right ml-1"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let scene, camera, renderer, controls;
+        let spermaGroup, ovumGroup;
+        let swimmingSperms = [];
+        let isSimulatingFertilization = false;
+        let simProgress = 0;
+
+        // Data Organel Sel Sperma & Ovum
+        const partData = {
+            // Sperma
+            akrosom: {
+                name: "Akrosom (Sperma)",
+                badge: "Enzim Pencerna",
+                desc: "Mengandung enzim akrosin yang berfungsi mencerna matriks zona pellusida pada ovum.",
+                color: 0x22d3ee,
+                cell: "sperma",
+                targetPos: new THREE.Vector3(-6, 2.2, 0),
+                camPos: new THREE.Vector3(-6, 2.2, 3.5)
+            },
+            nukleus_sperma: {
+                name: "Nukleus Sperma",
+                badge: "Materi Genetik (n)",
+                desc: "Menyimpan materi genetik DNA haploid jantan yang dipadatkan secara khusus.",
+                color: 0xa855f7,
+                cell: "sperma",
+                targetPos: new THREE.Vector3(-6, 1.2, 0),
+                camPos: new THREE.Vector3(-6, 1.2, 3.5)
+            },
+            leher: {
+                name: "Leher Sperma",
+                badge: "Sentriol / Penghubung",
+                desc: "Menghubungkan bagian kepala dengan midpiece, mengandung sentriol yang penting untuk pembelahan embrio.",
+                color: 0x3b82f6,
+                cell: "sperma",
+                targetPos: new THREE.Vector3(-6, 0.3, 0),
+                camPos: new THREE.Vector3(-6, 0.3, 3)
+            },
+            bagian_tengah: {
+                name: "Bagian Tengah (Midpiece)",
+                badge: "Mitokondria (Energi)",
+                desc: "Diperkaya dengan mitokondria heliks yang menghasilkan ATP sebagai sumber tenaga ekor.",
+                color: 0xf59e0b,
+                cell: "sperma",
+                targetPos: new THREE.Vector3(-6, -0.6, 0),
+                camPos: new THREE.Vector3(-6, -0.6, 3)
+            },
+            ekor: {
+                name: "Ekor (Flagelum)",
+                badge: "Alat Penggerak",
+                desc: "Struktur mikrotubulus (aksonema) yang mengibaskan ekor untuk mendorong sperma berenang.",
+                color: 0x6366f1,
+                cell: "sperma",
+                targetPos: new THREE.Vector3(-6, -2.5, 0),
+                camPos: new THREE.Vector3(-6, -2.5, 5)
+            },
+
+            // Ovum
+            korona_radiata: {
+                name: "Korona Radiata (Ovum)",
+                badge: "Lapisan Sel Folikel",
+                desc: "Sel-sel folikel pelindung yang melekat di permukaan luar ovum.",
+                color: 0xf472b6,
+                cell: "ovum",
+                targetPos: new THREE.Vector3(6, 0, 2.6),
+                camPos: new THREE.Vector3(6, 0, 7)
+            },
+            zona_pellusida: {
+                name: "Zona Pellusida",
+                badge: "Glikoprotein Pelindung",
+                desc: "Matriks bening pelindung yang mengatur ikatan spesies spesifik dan mencegah polispermi.",
+                color: 0xf43f5e,
+                cell: "ovum",
+                targetPos: new THREE.Vector3(6, 0, 2.0),
+                camPos: new THREE.Vector3(6, 0, 6)
+            },
+            nukleus_ovum: {
+                name: "Nukleus Ovum",
+                badge: "Materi Genetik (n)",
+                desc: "Inti sel haploid betina yang menyimpan informasi genetik ibu.",
+                color: 0xc084fc,
+                cell: "ovum",
+                targetPos: new THREE.Vector3(6, 0, 0),
+                camPos: new THREE.Vector3(6, 0, 3.5)
+            },
+            sitoplasma: {
+                name: "Sitoplasma / Ooplasma",
+                badge: "Cadangan Nutrisi",
+                desc: "Sitoplasma tebal yang dipenuhi organel dan cadangan makanan untuk perkembangan sel embrio.",
+                color: 0xf97316,
+                cell: "ovum",
+                targetPos: new THREE.Vector3(6, 0.8, 1.2),
+                camPos: new THREE.Vector3(6, 0.8, 4.5)
+            },
+            membran_plasma: {
+                name: "Membran Plasma Ovum",
+                badge: "Selektif Permeabel",
+                desc: "Membran yang membungkus sitoplasma dan melakukan fusi dengan membran kepala sperma.",
+                color: 0x14b8a6,
+                cell: "ovum",
+                targetPos: new THREE.Vector3(6, -1.2, 1.6),
+                camPos: new THREE.Vector3(6, -1.2, 4.5)
+            }
+        };
+
+        const raycaster = new THREE.Raycaster();
+        const mouse = new THREE.Vector2();
+
+        const container = document.getElementById('webgl-container');
+        const tooltip = document.getElementById('hotspot-tooltip');
+        const tooltipName = document.getElementById('tooltip-name');
+        const tooltipDesc = document.getElementById('tooltip-desc');
+        const tooltipDot = document.getElementById('tooltip-dot');
+
+        function initScene() {
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x05050f);
+            scene.fog = new THREE.FogExp2(0x05050f, 0.012);
+
+            camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 100);
+            camera.position.set(0, 1, 17);
+
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            renderer.setSize(container.clientWidth, container.clientHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.toneMapping = THREE.ACESFilmicToneMapping;
+            container.appendChild(renderer.domElement);
+
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+            controls.maxDistance = 28;
+            controls.minDistance = 3;
+            controls.target.set(0, 0, 0);
+
+            setupLighting();
+            createSpermaModel();
+            createOvumModel();
+            createBackgroundSperms();
+
+            window.addEventListener('resize', onWindowResize);
+            renderer.domElement.addEventListener('pointerdown', onPointerClick);
+            renderer.domElement.addEventListener('pointermove', onPointerMove);
+
+            document.getElementById('part-search').addEventListener('input', handleSearch);
+
+            animate();
+        }
+
+        function setupLighting() {
+            const ambientLight = new THREE.AmbientLight(0xffffff, 1.1);
+            scene.add(ambientLight);
+
+            const dirLight1 = new THREE.DirectionalLight(0x818cf8, 1.8);
+            dirLight1.position.set(-10, 15, 10);
+            scene.add(dirLight1);
+
+            const dirLight2 = new THREE.DirectionalLight(0xf472b6, 1.8);
+            dirLight2.position.set(10, -10, 10);
+            scene.add(dirLight2);
+
+            const pointLight = new THREE.PointLight(0x38bdf8, 1.5, 20);
+            pointLight.position.set(0, 0, 5);
+            scene.add(pointLight);
+        }
+
+        function createSpermaModel() {
+            spermaGroup = new THREE.Group();
+            spermaGroup.position.set(-6, 0, 0);
+
+            // 1. Akrosom (Cap)
+            const akrosomGeo = new THREE.ConeGeometry(0.7, 1.0, 32);
+            const akrosomMat = new THREE.MeshStandardMaterial({
+                color: 0x22d3ee,
+                roughness: 0.2,
+                metalness: 0.3,
+                transparent: true,
+                opacity: 0.85,
+                emissive: 0x0891b2,
+                emissiveIntensity: 0.3
+            });
+            const akrosomMesh = new THREE.Mesh(akrosomGeo, akrosomMat);
+            akrosomMesh.position.y = 2.2;
+            akrosomMesh.userData = { partKey: 'akrosom' };
+            spermaGroup.add(akrosomMesh);
+
+            // 2. Kepala & Nukleus
+            const headGeo = new THREE.SphereGeometry(0.85, 32, 32);
+            headGeo.scale(0.8, 1.4, 0.6);
+            const headMat = new THREE.MeshPhysicalMaterial({
+                color: 0x6366f1,
+                roughness: 0.3,
+                transmission: 0.5,
+                transparent: true,
+                opacity: 0.9,
+                clearcoat: 0.8
+            });
+            const headMesh = new THREE.Mesh(headGeo, headMat);
+            headMesh.position.y = 1.2;
+            headMesh.userData = { partKey: 'nukleus_sperma' };
+            spermaGroup.add(headMesh);
+
+            // Inner Chromatin Nukleus
+            const nucInnerGeo = new THREE.SphereGeometry(0.5, 16, 16);
+            nucInnerGeo.scale(0.7, 1.1, 0.5);
+            const nucInnerMat = new THREE.MeshStandardMaterial({
+                color: 0xa855f7,
+                emissive: 0x7e22ce,
+                emissiveIntensity: 0.6
+            });
+            const nucInnerMesh = new THREE.Mesh(nucInnerGeo, nucInnerMat);
+            nucInnerMesh.position.y = 1.2;
+            spermaGroup.add(nucInnerMesh);
+
+            // 3. Leher (Neck)
+            const leherGeo = new THREE.CylinderGeometry(0.22, 0.25, 0.4, 16);
+            const leherMat = new THREE.MeshStandardMaterial({ color: 0x3b82f6, roughness: 0.4 });
+            const leherMesh = new THREE.Mesh(leherGeo, leherMat);
+            leherMesh.position.y = 0.25;
+            leherMesh.userData = { partKey: 'leher' };
+            spermaGroup.add(leherMesh);
+
+            // 4. Bagian Tengah (Midpiece with Spiral Mitochondria)
+            const midpieceGroup = new THREE.Group();
+            midpieceGroup.position.y = -0.6;
+
+            const midCoreGeo = new THREE.CylinderGeometry(0.2, 0.18, 1.3, 16);
+            const midCoreMat = new THREE.MeshStandardMaterial({ color: 0x1e293b });
+            const midCore = new THREE.Mesh(midCoreGeo, midCoreMat);
+            midpieceGroup.add(midCore);
+
+            // Spiral Mitochondria rings
+            for (let i = 0; i < 8; i++) {
+                const mitoGeo = new THREE.TorusGeometry(0.24, 0.08, 12, 24);
+                const mitoMat = new THREE.MeshStandardMaterial({ color: 0xf59e0b, emissive: 0xd97706, emissiveIntensity: 0.3 });
+                const mito = new THREE.Mesh(mitoGeo, mitoMat);
+                mito.rotation.x = Math.PI / 2;
+                mito.position.y = 0.5 - i * 0.14;
+                midpieceGroup.add(mito);
+            }
+            midpieceGroup.userData = { partKey: 'bagian_tengah' };
+            spermaGroup.add(midpieceGroup);
+
+            // 5. Ekor (Flagelum Curve Mesh)
+            const tailCurve = new THREE.CatmullRomCurve3([
+                new THREE.Vector3(0, -1.2, 0),
+                new THREE.Vector3(0.2, -2.0, 0),
+                new THREE.Vector3(-0.2, -2.8, 0),
+                new THREE.Vector3(0.2, -3.6, 0),
+                new THREE.Vector3(0, -4.5, 0)
+            ]);
+            const tailGeo = new THREE.TubeGeometry(tailCurve, 32, 0.08, 8, false);
+            const tailMat = new THREE.MeshStandardMaterial({ color: 0x818cf8, roughness: 0.3 });
+            const tailMesh = new THREE.Mesh(tailGeo, tailMat);
+            tailMesh.name = 'spermaTail';
+            tailMesh.userData = { partKey: 'ekor' };
+            spermaGroup.add(tailMesh);
+
+            scene.add(spermaGroup);
+        }
+
+        function createOvumModel() {
+            ovumGroup = new THREE.Group();
+            ovumGroup.position.set(6, 0, 0);
+
+            // 1. Core Nucleus & Nucleolus
+            const nucGeo = new THREE.SphereGeometry(0.8, 32, 32);
+            const nucMat = new THREE.MeshStandardMaterial({
+                color: 0xc084fc,
+                emissive: 0x9333ea,
+                emissiveIntensity: 0.5,
+                roughness: 0.3
+            });
+            const nucMesh = new THREE.Mesh(nucGeo, nucMat);
+            nucMesh.userData = { partKey: 'nukleus_ovum' };
+            ovumGroup.add(nucMesh);
+
+            // Nucleolus
+            const nucletGeo = new THREE.SphereGeometry(0.3, 16, 16);
+            const nucletMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+            const nuclet = new THREE.Mesh(nucletGeo, nucletMat);
+            nuclet.position.set(0.2, 0.2, 0.2);
+            nucMesh.add(nuclet);
+
+            // 2. Sitoplasma / Ooplasma (Gel sphere with granulations)
+            const cytoGeo = new THREE.SphereGeometry(1.8, 32, 32);
+            const cytoMat = new THREE.MeshPhysicalMaterial({
+                color: 0xf97316,
+                roughness: 0.2,
+                transmission: 0.7,
+                transparent: true,
+                opacity: 0.75,
+                ior: 1.2
+            });
+            const cytoMesh = new THREE.Mesh(cytoGeo, cytoMat);
+            cytoMesh.userData = { partKey: 'sitoplasma' };
+            ovumGroup.add(cytoMesh);
+
+            // Cytoplasmic Granules
+            const granuleGroup = new THREE.Group();
+            for (let g = 0; g < 60; g++) {
+                const gGeo = new THREE.SphereGeometry(0.06 + Math.random() * 0.05, 8, 8);
+                const gMat = new THREE.MeshStandardMaterial({ color: 0xfb923c });
+                const gMesh = new THREE.Mesh(gGeo, gMat);
+
+                const phi = Math.acos(-1 + (2 * g) / 60);
+                const theta = Math.sqrt(60 * Math.PI) * phi;
+                const r = 0.9 + Math.random() * 0.7;
+
+                gMesh.position.set(
+                    r * Math.cos(theta) * Math.sin(phi),
+                    r * Math.sin(theta) * Math.sin(phi),
+                    r * Math.cos(phi)
+                );
+                granuleGroup.add(gMesh);
+            }
+            ovumGroup.add(granuleGroup);
+
+            // 3. Membran Plasma
+            const plasmaGeo = new THREE.SphereGeometry(1.85, 32, 32);
+            const plasmaMat = new THREE.MeshBasicMaterial({
+                color: 0x14b8a6,
+                wireframe: true,
+                transparent: true,
+                opacity: 0.25
+            });
+            const plasmaMesh = new THREE.Mesh(plasmaGeo, plasmaMat);
+            plasmaMesh.userData = { partKey: 'membran_plasma' };
+            ovumGroup.add(plasmaMesh);
+
+            // 4. Zona Pellusida (Gelatinous translucent ring)
+            const zonaGeo = new THREE.SphereGeometry(2.2, 32, 32);
+            const zonaMat = new THREE.MeshPhysicalMaterial({
+                color: 0xf43f5e,
+                roughness: 0.1,
+                transmission: 0.85,
+                transparent: true,
+                opacity: 0.45,
+                ior: 1.4
+            });
+            const zonaMesh = new THREE.Mesh(zonaGeo, zonaMat);
+            zonaMesh.userData = { partKey: 'zona_pellusida' };
+            ovumGroup.add(zonaMesh);
+
+            // 5. Korona Radiata (Outer follicular cells layer)
+            const coronaGroup = new THREE.Group();
+            const cellCount = 180;
+            for (let i = 0; i < cellCount; i++) {
+                const fGeo = new THREE.SphereGeometry(0.22, 12, 12);
+                const fMat = new THREE.MeshStandardMaterial({
+                    color: 0xf472b6,
+                    roughness: 0.5,
+                    emissive: 0xdb2777,
+                    emissiveIntensity: 0.2
+                });
+                const fMesh = new THREE.Mesh(fGeo, fMat);
+
+                const phi = Math.acos(-1 + (2 * i) / cellCount);
+                const theta = Math.sqrt(cellCount * Math.PI) * phi;
+                const radius = 2.45 + Math.random() * 0.2;
+
+                fMesh.position.set(
+                    radius * Math.cos(theta) * Math.sin(phi),
+                    radius * Math.sin(theta) * Math.sin(phi),
+                    radius * Math.cos(phi)
+                );
+                coronaGroup.add(fMesh);
+            }
+            coronaGroup.userData = { partKey: 'korona_radiata' };
+            ovumGroup.add(coronaGroup);
+
+            scene.add(ovumGroup);
+        }
+
+        function createBackgroundSperms() {
+            for (let s = 0; s < 15; s++) {
+                const bgSperm = new THREE.Group();
+                
+                const sHeadGeo = new THREE.ConeGeometry(0.15, 0.4, 8);
+                const sHeadMat = new THREE.MeshBasicMaterial({ color: 0x818cf8, transparent: true, opacity: 0.6 });
+                const sHead = new THREE.Mesh(sHeadGeo, sHeadMat);
+                sHead.rotation.x = Math.PI / 2;
+                bgSperm.add(sHead);
+
+                bgSperm.position.set(
+                    (Math.random() - 0.5) * 30,
+                    (Math.random() - 0.5) * 20,
+                    (Math.random() - 0.5) * 15 - 5
+                );
+
+                bgSperm.userData = {
+                    speed: 0.03 + Math.random() * 0.04,
+                    wiggleOffset: Math.random() * Math.PI * 2
+                };
+
+                swimmingSperms.push(bgSperm);
+                scene.add(bgSperm);
+            }
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+
+            const time = performance.now() * 0.002;
+
+            // Idle rotation for Ovum & Sperm
+            if (ovumGroup) {
+                ovumGroup.rotation.y += 0.003;
+            }
+
+            // Animate Sperm Tail Wave
+            if (spermaGroup) {
+                const tailMesh = spermaGroup.getObjectByName('spermaTail');
+                if (tailMesh) {
+                    tailMesh.rotation.z = Math.sin(time * 6) * 0.05;
+                }
+            }
+
+            // Animate background swimming sperms
+            swimmingSperms.forEach((sperm, idx) => {
+                sperm.position.x += Math.sin(time * 2 + idx) * 0.02 + sperm.userData.speed;
+                sperm.position.y += Math.cos(time * 3 + idx) * 0.015;
+                sperm.rotation.z = Math.sin(time * 8 + sperm.userData.wiggleOffset) * 0.2;
+
+                if (sperm.position.x > 18) sperm.position.x = -18;
+            });
+
+            // Fertilization Simulation Interpolation
+            if (isSimulatingFertilization) {
+                updateFertilizationSim();
+            }
+
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        function focusCell(type) {
+            isSimulatingFertilization = false;
+
+            if (type === 'all') {
+                tweenCamera(new THREE.Vector3(0, 1, 17), new THREE.Vector3(0, 0, 0));
+                document.getElementById('active-summary-title').innerText = "Visualisasi 3D Sel Sperma & Sel Ovum";
+                document.getElementById('active-summary-desc').innerText = "Arahkan kursor atau klik bagian sel pada model 3D untuk mempelajari organel secara lengkap.";
+                document.getElementById('summary-icon').className = "fa-solid fa-microscope text-lg";
+                clearActiveCards();
+                return;
+            }
+
+            if (type === 'sperma') {
+                tweenCamera(new THREE.Vector3(-6, 0, 9), new THREE.Vector3(-6, 0, 0));
+                document.getElementById('active-summary-title').innerText = "Sel Sperma (Spermatozoa)";
+                document.getElementById('active-summary-desc').innerText = "Ukuran ~50-60 µm, motil, diproduksi di testis secara teratur.";
+                document.getElementById('summary-icon').className = "fa-solid fa-mars text-lg text-indigo-400";
+            } else if (type === 'ovum') {
+                tweenCamera(new THREE.Vector3(6, 0, 9), new THREE.Vector3(6, 0, 0));
+                document.getElementById('active-summary-title').innerText = "Sel Ovum (Sel Telur)";
+                document.getElementById('active-summary-desc').innerText = "Ukuran ~100-150 µm, non-motil, diproduksi di ovarium saat ovulasi.";
+                document.getElementById('summary-icon').className = "fa-solid fa-venus text-lg text-pink-400";
+            }
+        }
+
+        function focusPart(partKey) {
+            const data = partData[partKey];
+            if (!data) return;
+
+            isSimulatingFertilization = false;
+            tweenCamera(data.camPos, data.targetPos);
+
+            // Highlight card in list
+            clearActiveCards();
+            const card = document.getElementById(`card-${partKey}`);
+            if (card) {
+                card.classList.add('active-card');
+                card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }
+
+            // Update bottom banner HUD
+            document.getElementById('active-summary-title').innerText = data.name;
+            document.getElementById('active-summary-desc').innerText = data.desc;
+            document.getElementById('summary-icon').className = `fa-solid fa-circle-dot text-lg text-${data.cell === 'sperma' ? 'indigo' : 'pink'}-400`;
+        }
+
+        function clearActiveCards() {
+            document.querySelectorAll('.glass-card').forEach(c => c.classList.remove('active-card'));
+        }
+
+        function tweenCamera(camPos, targetPos, duration = 800) {
+            const startCam = camera.position.clone();
+            const startTarget = controls.target.clone();
+            const startTime = performance.now();
+
+            function update(now) {
+                const elapsed = now - startTime;
+                const progress = Math.min(elapsed / duration, 1);
+                const ease = 1 - Math.pow(1 - progress, 3);
+
+                camera.position.lerpVectors(startCam, camPos, ease);
+                controls.target.lerpVectors(startTarget, targetPos, ease);
+
+                if (progress < 1) {
+                    requestAnimationFrame(update);
+                }
+            }
+            requestAnimationFrame(update);
+        }
+
+        function onPointerClick(event) {
+            const rect = renderer.domElement.getBoundingClientRect();
+            mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+            mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+
+            raycaster.setFromCamera(mouse, camera);
+            const intersects = raycaster.intersectObjects(scene.children, true);
+
+            if (intersects.length > 0) {
+                let hitObj = intersects[0].object;
+                while (hitObj && !hitObj.userData.partKey && hitObj.parent) {
+                    hitObj = hitObj.parent;
+                }
+                if (hitObj && hitObj.userData && hitObj.userData.partKey) {
+                    focusPart(hitObj.userData.partKey);
+                }
+            }
+        }
+
+        function onPointerMove(event) {
+            const rect = renderer.domElement.getBoundingClientRect();
+            mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+            mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+
+            raycaster.setFromCamera(mouse, camera);
+            const intersects = raycaster.intersectObjects(scene.children, true);
+
+            if (intersects.length > 0) {
+                let hitObj = intersects[0].object;
+                while (hitObj && !hitObj.userData.partKey && hitObj.parent) {
+                    hitObj = hitObj.parent;
+                }
+                if (hitObj && hitObj.userData && hitObj.userData.partKey) {
+                    const data = partData[hitObj.userData.partKey];
+                    if (data) {
+                        container.style.cursor = 'pointer';
+                        showTooltip(event.clientX, event.clientY, data.name, data.badge, data.color);
+                        return;
+                    }
+                }
+            }
+            container.style.cursor = 'grab';
+            hideTooltip();
+        }
+
+        function showTooltip(x, y, name, badge, colorHex) {
+            tooltipName.innerText = name;
+            tooltipDesc.innerText = badge;
+            if (colorHex) {
+                tooltipDot.style.backgroundColor = '#' + colorHex.toString(16).padStart(6, '0');
+            }
+            tooltip.style.left = `${x}px`;
+            tooltip.style.top = `${y}px`;
+            tooltip.classList.remove('hidden');
+        }
+
+        function hideTooltip() {
+            tooltip.classList.add('hidden');
+        }
+
+        function startFertilizationSim() {
+            isSimulatingFertilization = true;
+            simProgress = 0;
+
+            // Reset sperma position for swimming towards ovum
+            spermaGroup.position.set(-10, 0, 0);
+            spermaGroup.rotation.z = -Math.PI / 2;
+
+            tweenCamera(new THREE.Vector3(2, 0, 10), new THREE.Vector3(3, 0, 0), 1000);
+
+            document.getElementById('active-summary-title').innerText = "Proses Fertilisasi Berlangsung...";
+            document.getElementById('active-summary-desc').innerText = "Sperma berenang menembus Korona Radiata & Zona Pellusida untuk membuahi Ovum.";
+            document.getElementById('summary-icon').className = "fa-solid fa-bolt text-lg text-amber-400 animate-bounce";
+        }
+
+        function updateFertilizationSim() {
+            simProgress += 0.005;
+
+            if (simProgress < 1.0) {
+                // Sperm swims towards Ovum center
+                spermaGroup.position.x = -10 + simProgress * 13.8;
+            } else {
+                // Sperm reaches ovum membrane
+                spermaGroup.position.x = 3.8;
+                document.getElementById('active-summary-title').innerText = "Fertilisasi Berhasil! (Pembentukan Zigot)";
+                document.getElementById('active-summary-desc').innerText = "Reaksi kortikal diaktifkan untuk mencegah polispermi. Materi genetik melebur.";
+            }
+        }
+
+        function handleSearch(e) {
+            const query = e.target.value.toLowerCase().trim();
+            document.querySelectorAll('#tab-content-parts .glass-card').forEach(card => {
+                const text = card.innerText.toLowerCase();
+                card.style.display = text.includes(query) ? 'block' : 'none';
+            });
+        }
+
+        function switchTab(tabKey) {
+            const partsTab = document.getElementById('tab-content-parts');
+            const factsTab = document.getElementById('tab-content-facts');
+            const processTab = document.getElementById('tab-content-process');
+
+            const btnParts = document.getElementById('tab-btn-parts');
+            const btnFacts = document.getElementById('tab-btn-facts');
+            const btnProcess = document.getElementById('tab-btn-process');
+
+            partsTab.classList.add('hidden');
+            factsTab.classList.add('hidden');
+            processTab.classList.add('hidden');
+
+            btnParts.className = "py-3 text-slate-400 hover:text-slate-200 transition";
+            btnFacts.className = "py-3 text-slate-400 hover:text-slate-200 transition";
+            btnProcess.className = "py-3 text-slate-400 hover:text-slate-200 transition";
+
+            if (tabKey === 'parts') {
+                partsTab.classList.remove('hidden');
+                btnParts.className = "py-3 text-indigo-400 border-b-2 border-indigo-500 bg-slate-800/50 transition";
+            } else if (tabKey === 'facts') {
+                factsTab.classList.remove('hidden');
+                btnFacts.className = "py-3 text-indigo-400 border-b-2 border-indigo-500 bg-slate-800/50 transition";
+            } else if (tabKey === 'process') {
+                processTab.classList.remove('hidden');
+                btnProcess.className = "py-3 text-indigo-400 border-b-2 border-indigo-500 bg-slate-800/50 transition";
+            }
+        }
+
+        function onWindowResize() {
+            camera.aspect = container.clientWidth / container.clientHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(container.clientWidth, container.clientHeight);
+        }
+
+        const quizQuestions = [
+            {
+                q: "Bagian ujung kepala sel sperma yang mengandung enzim akrosin untuk menembus ovum disebut...",
+                opts: ["Nukleus", "Akrosom", "Mitokondria", "Korona Radiata"],
+                ans: 1
+            },
+            {
+                q: "Organel sel sperma yang terletak di Bagian Tengah (Midpiece) untuk menghasilkan energi gerak adalah...",
+                opts: ["Ribosom", "Lisosom", "Mitokondria", "Sentriol"],
+                ans: 2
+            },
+            {
+                q: "Lapisan luar sel telur (ovum) yang tersusun dari sel-sel folikel pelindung adalah...",
+                opts: ["Zona Pellusida", "Membran Plasma", "Korona Radiata", "Akrosom"],
+                ans: 2
+            },
+            {
+                q: "Manakah pernyataan yang BENAR mengenai perbandingan sel sperma dan ovum?",
+                opts: [
+                    "Sperma berukuran lebih besar dari ovum",
+                    "Ovum memiliki ekor flagelum untuk bergerak aktif",
+                    "Ovum berukuran jauh lebih besar (~100-150 µm) dan menyimpan cadangan nutrisi",
+                    "Sperma diproduksi di ovarium"
+                ],
+                ans: 2
+            }
+        ];
+
+        let currentQIndex = 0;
+        let quizScore = 0;
+
+        function openQuizModal() {
+            document.getElementById('quiz-modal').classList.remove('hidden');
+            currentQIndex = 0;
+            quizScore = 0;
+            loadQuestion();
+        }
+
+        function closeQuizModal() {
+            document.getElementById('quiz-modal').classList.add('hidden');
+        }
+
+        function loadQuestion() {
+            const qData = quizQuestions[currentQIndex];
+            document.getElementById('quiz-question').innerText = `${currentQIndex + 1}. ${qData.q}`;
+            document.getElementById('quiz-score').innerText = `Skor: ${quizScore}`;
+
+            const feedback = document.getElementById('quiz-feedback');
+            feedback.classList.add('hidden');
+
+            const optsBox = document.getElementById('quiz-options');
+            optsBox.innerHTML = '';
+
+            qData.opts.forEach((optText, idx) => {
+                const btn = document.createElement('button');
+                btn.className = 'w-full text-left p-2.5 rounded-xl bg-slate-800/90 hover:bg-indigo-600/30 border border-slate-700 transition font-medium text-slate-200';
+                btn.innerText = optText;
+                btn.onclick = () => checkAnswer(idx, btn);
+                optsBox.appendChild(btn);
+            });
+        }
+
+        function checkAnswer(selectedIdx, btnElement) {
+            const qData = quizQuestions[currentQIndex];
+            const feedback = document.getElementById('quiz-feedback');
+            feedback.classList.remove('hidden');
+
+            if (selectedIdx === qData.ans) {
+                quizScore += 25;
+                feedback.className = "text-xs font-semibold p-2.5 rounded-xl text-center bg-emerald-500/20 text-emerald-300 border border-emerald-500/40";
+                feedback.innerText = "Jawaban Benar! 🎉";
+            } else {
+                feedback.className = "text-xs font-semibold p-2.5 rounded-xl text-center bg-red-500/20 text-red-300 border border-red-500/40";
+                feedback.innerText = `Jawaban Salah. Jawaban yang benar: ${qData.opts[qData.ans]}`;
+            }
+
+            document.getElementById('quiz-score').innerText = `Skor: ${quizScore}`;
+
+            const buttons = document.querySelectorAll('#quiz-options button');
+            buttons.forEach(b => b.disabled = true);
+        }
+
+        function nextQuestion() {
+            currentQIndex++;
+            if (currentQIndex < quizQuestions.length) {
+                loadQuestion();
+            } else {
+                document.getElementById('quiz-question').innerText = `Kuis Selesai! Skor Akhir Anda: ${quizScore} / 100`;
+                document.getElementById('quiz-options').innerHTML = '';
+                document.getElementById('quiz-feedback').classList.add('hidden');
+            }
+        }
+
+        // Window Load Trigger
+        window.onload = function() {
+            initScene();
+        };
+    </script>
+</body>
+</html>
